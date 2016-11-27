@@ -5,6 +5,7 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.io.StringWriter;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -13,28 +14,28 @@ public class TextSearcher {
 
 	//	class to represent a token in the data
 	private class Token {
-		private String _token;
 		private Integer _startPosition;
 		private Integer _endPosition;
+		private Integer _index;
 		
-		public Token(String token, Integer startPosition, Integer endPosition) {
-			setToken(token);
+		/**
+		 * @return the _index
+		 */
+		public Integer get_index() {
+			return _index;
+		}
+
+		/**
+		 * @param _index the _index to set
+		 */
+		public void set_index(Integer _index) {
+			this._index = _index;
+		}
+
+		public Token(String token, Integer startPosition, Integer endPosition, Integer index) {
 			setStartPosition(startPosition);
 			setEndPosition(endPosition);
-		}
-
-		/**
-		 * @return the token
-		 */
-		public String getToken() {
-			return _token;
-		}
-
-		/**
-		 * @param token the token to set
-		 */
-		public void setToken(String token) {
-			this._token = token;
+			set_index(index);
 		}
 
 		/**
@@ -71,6 +72,9 @@ public class TextSearcher {
 	
 	// string data represented as an array of tokens 
 	private List<Token> _tokenArray = new ArrayList<Token>();
+	
+	// hashmap that maps token string to Token object
+	private HashMap<String, List<Token>> _tokenMap = new HashMap<String, List<Token>>();
 
 	/**
 	 * Initializes the text searcher with the contents of a text file.
@@ -113,8 +117,21 @@ public class TextSearcher {
 		Matcher m = p.matcher(_data);
 		
 		// iterate over matches and add to tokenArray.
-		while(m.find())
-			_tokenArray.add(new Token(m.group(), m.start(), m.end()));
+		for (int i = 0; m.find(); i++) {
+			Token t = new Token(m.group(), m.start(), m.end(), i);
+			_tokenArray.add(t);
+
+			String tokenLowerCase = m.group().toLowerCase();
+			if (_tokenMap.containsKey(tokenLowerCase)) {
+				_tokenMap.get(tokenLowerCase).add(t);
+			}
+			else {
+				List<Token> l = new ArrayList<Token>();
+				l.add(t);
+				_tokenMap.put(tokenLowerCase, l);
+			}
+			
+		}
 	}
 	
 	/**
@@ -127,32 +144,16 @@ public class TextSearcher {
 	public String[] search(String queryWord,int contextWords) {
 		// TODO -- fill in implementation
 		
-		// pattern to match the queryWord as a regex.
-		Pattern pattern = Pattern.compile(queryWord, Pattern.CASE_INSENSITIVE);
+		// check the token map
+		List<Token> tokenList = _tokenMap.getOrDefault(queryWord.toLowerCase(), new ArrayList<Token>(0));
 		
-		// matcher to match in the data.
-		Matcher m;
+		String[] results = new String[tokenList.size()];
 		
-		// list of indices in tokenArray that match the queryWord
-		List<Integer> matchIndices = new ArrayList<Integer>();
-		
-		// iterate over the tokens and if it matches, add to the matchIndices.
-		for (int i = 0; i < _tokenArray.size(); i++) {
-			m = pattern.matcher(_tokenArray.get(i).getToken());
-			
-			if (m.matches())
-				matchIndices.add(i);
+		for (int i = 0; i < tokenList.size(); i++) {
+			results[i] = getMatchContextByIndex(tokenList.get(i).get_index(), contextWords);
 		}
 		
-		// the results to return
-		String[] results = new String[matchIndices.size()];
-		
-		// get context for each match
-		for (int i = 0; i < matchIndices.size(); i++)
-			results[i] = getMatchContextByIndex(matchIndices.get(i), contextWords);
-		
 		return results;
-		
 	}
 
 	// method to index into the tokenArray and return the surrounding context.
